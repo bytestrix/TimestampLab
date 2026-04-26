@@ -230,6 +230,19 @@ export default function TimestampConverter() {
                     <div className="now-sub">
                         Live Unix timestamp · {timeFormat === 's' ? 'seconds.milliseconds' : 'milliseconds'}
                     </div>
+                    <div style={{
+                        marginTop: '6px',
+                        display: 'flex',
+                        gap: '12px',
+                        flexWrap: 'wrap',
+                        fontSize: '11px',
+                        color: 'var(--text-2)',
+                        fontFamily: 'var(--mono)',
+                    }}>
+                        <span>{new Date(tick).toUTCString()}</span>
+                        <span style={{ color: 'var(--text-3)' }}>·</span>
+                        <span style={{ color: 'var(--accent)' }}>{getRelativeTime(new Date(tick))}</span>
+                    </div>
                 </div>
                 <div className="now-actions">
                     <button
