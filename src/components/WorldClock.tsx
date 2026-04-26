@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import WorldMap from './WorldMap';
-import type { CountryFeature } from '../data/worldMap';
-import { MULTI_TZ_COUNTRIES, type CityOption } from '../data/multiTzCountries';
+import { type CityOption } from '../data/multiTzCountries';
 import { X } from 'lucide-react';
 
 const DEFAULT_CITIES = [
@@ -132,7 +131,6 @@ export default function WorldClock() {
   const [cities, setCities] = useState<CityEntry[]>(DEFAULT_CITIES);
   const [selectedTz, setSelectedTz] = useState<string | undefined>();
   const [showMap, setShowMap] = useState(true);
-  const [cityPicker, setCityPicker] = useState<{ country: CountryFeature; cities: CityOption[] } | null>(null);
 
   const localTz = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
   const userCountry = useMemo(() => getCountryFromTimezone(localTz), [localTz]);
@@ -153,22 +151,6 @@ export default function WorldClock() {
     addCity(city.name, city.tz, '', city.name);
   }, [addCity]);
 
-  const handleCountrySelect = useCallback((country: CountryFeature) => {
-    const multiCities = MULTI_TZ_COUNTRIES[country.name];
-    if (multiCities) {
-      // Show city picker for multi-tz countries
-      setCityPicker({ country, cities: multiCities });
-    } else {
-      addCity(country.name, country.tz, country.flag, country.name);
-    }
-  }, [addCity]);
-
-  const handleCityPick = useCallback((city: CityOption) => {
-    if (!cityPicker) return;
-    addCity(city.name, city.tz, cityPicker.country.flag, cityPicker.country.name);
-    setCityPicker(null);
-  }, [cityPicker, addCity]);
-
   const removeCity = useCallback((tz: string, name: string) => {
     setCities(prev => prev.filter(c => !(c.tz === tz && c.name === name)));
     if (selectedTz === tz) setSelectedTz(undefined);
@@ -176,17 +158,6 @@ export default function WorldClock() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* City picker modal */}
-      {cityPicker && (
-        <CityPicker
-          country={cityPicker.country.name}
-          cities={cityPicker.cities}
-          flag={cityPicker.country.flag}
-          onPick={handleCityPick}
-          onClose={() => setCityPicker(null)}
-        />
-      )}
-
       {/* Map */}
       <div className="card">
         <div className="card-hd" style={{ marginBottom: '12px' }}>
@@ -208,13 +179,12 @@ export default function WorldClock() {
         {showMap && (
           <>
             <WorldMap
-              onSelect={handleCountrySelect}
               onCitySelect={handleCityDotClick}
               selectedTz={selectedTz}
               userCountry={userCountry ?? undefined}
             />
             <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px', textAlign: 'center' }}>
-              Click any country to add it · hover to see local time
+              Hover a city dot to see local time · click to add to clock
             </p>
           </>
         )}
