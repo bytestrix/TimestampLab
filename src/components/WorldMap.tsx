@@ -86,7 +86,11 @@ export default function WorldMap({ onCountryClick, onCityClick, selectedTz, user
     onCountryClick(country, multiCities);
   }, [getSVGCoords, onCountryClick]);
 
-  const tooltip = hoveredCity ?? (hoveredCountry ? { name: hoveredCountry.name, tz: hoveredCountry.tz } : null);
+  const tooltipData = hoveredCity
+    ? { name: hoveredCity.name, tz: hoveredCity.tz, flag: hoveredCity.flag, country: hoveredCity.country }
+    : hoveredCountry
+    ? { name: hoveredCountry.name, tz: hoveredCountry.tz, flag: hoveredCountry.flag, country: hoveredCountry.name }
+    : null;
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -164,9 +168,9 @@ export default function WorldMap({ onCountryClick, onCityClick, selectedTz, user
       </svg>
 
       {/* Tooltip */}
-      {tooltip && (
+      {tooltipData && (
         <div
-          key={`${tooltip.name}-${tick}`}
+          key={`${tooltipData.name}-${tick}`}
           style={{
             position: 'fixed',
             left: tooltipPos.x + 14,
@@ -181,14 +185,20 @@ export default function WorldMap({ onCountryClick, onCityClick, selectedTz, user
             whiteSpace: 'nowrap',
           }}
         >
-          <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px', marginBottom: '4px' }}>
-            {tooltip.name}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
+            {tooltipData.flag && <span style={{ fontSize: '18px' }}>{tooltipData.flag}</span>}
+            <div>
+              <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>{tooltipData.name}</div>
+              {tooltipData.country && tooltipData.country !== tooltipData.name && (
+                <div style={{ fontSize: '10px', color: 'var(--text-3)' }}>{tooltipData.country}</div>
+              )}
+            </div>
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>
-            {getLocalTime(tooltip.tz)}
+            {getLocalTime(tooltipData.tz)}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '3px' }}>
-            {getOffsetStr(tooltip.tz)} · click to add
+            {getOffsetStr(tooltipData.tz)} · click to add
           </div>
         </div>
       )}
