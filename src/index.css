@@ -32,6 +32,7 @@
   --map-hover: #2a4a6b;
   --map-user: #1e3a2f;
   --map-border: #070c14;
+  --map-dot: rgba(255,255,255,0.6);
 }
 
 .light {
@@ -56,6 +57,7 @@
   --map-hover: #6ea8fe;
   --map-user: #bbf7d0;
   --map-border: #dde8f5;
+  --map-dot: rgba(30,30,60,0.7);
 }
 
 html, body {

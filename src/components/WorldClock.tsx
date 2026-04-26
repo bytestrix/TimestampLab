@@ -149,6 +149,10 @@ export default function WorldClock() {
     ]);
   }, []);
 
+  const handleCityDotClick = useCallback((city: CityOption) => {
+    addCity(city.name, city.tz, '', city.name);
+  }, [addCity]);
+
   const handleCountrySelect = useCallback((country: CountryFeature) => {
     const multiCities = MULTI_TZ_COUNTRIES[country.name];
     if (multiCities) {
@@ -205,6 +209,7 @@ export default function WorldClock() {
           <>
             <WorldMap
               onSelect={handleCountrySelect}
+              onCitySelect={handleCityDotClick}
               selectedTz={selectedTz}
               userCountry={userCountry ?? undefined}
             />

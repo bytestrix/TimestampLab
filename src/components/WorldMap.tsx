@@ -1,11 +1,13 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { WORLD_FEATURES, type CountryFeature } from '../data/worldMap';
-import { coordsToPath, unproject, pointInGeometry, getBBox } from '../utils/mapUtils';
+import { MAP_CITIES, type CityOption } from '../data/multiTzCountries';
+import { coordsToPath, unproject, pointInGeometry, getBBox, project } from '../utils/mapUtils';
 
 interface Props {
   onSelect: (country: CountryFeature) => void;
+  onCitySelect?: (city: CityOption) => void;
   selectedTz?: string;
-  userCountry?: string; // name of user's country to highlight
+  userCountry?: string;
 }
 
 // Pre-compute bounding boxes once
@@ -45,8 +47,9 @@ function getOffsetStr(tz: string): string {
   } catch { return ''; }
 }
 
-export default function WorldMap({ onSelect, selectedTz, userCountry }: Props) {
+export default function WorldMap({ onSelect, onCitySelect, selectedTz, userCountry }: Props) {
   const [hovered, setHovered] = useState<CountryFeature | null>(null);
+  const [hoveredCity, setHoveredCity] = useState<CityOption | null>(null);
   const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
   const [tick, setTick] = useState(Date.now());
   const svgRef = useRef<SVGSVGElement>(null);
@@ -80,6 +83,7 @@ export default function WorldMap({ onSelect, selectedTz, userCountry }: Props) {
     if (!coords) return;
     const country = findCountry(coords[0], coords[1]);
     setHovered(country);
+    setHoveredCity(null);
     setTooltipPos({ x: e.clientX, y: e.clientY });
   }, [getSVGCoords]);
 
@@ -139,12 +143,41 @@ export default function WorldMap({ onSelect, selectedTz, userCountry }: Props) {
             />
           );
         })}
+        {/* City dots */}
+        {MAP_CITIES.map(city => {
+          const [cx, cy] = project(city.lng, city.lat);
+          const isActiveTz = selectedTz === city.tz;
+          return (
+            <g key={`${city.name}-dot`}>
+              <circle
+                cx={cx} cy={cy} r="3.5"
+                fill={isActiveTz ? 'var(--accent)' : 'var(--map-dot, rgba(255,255,255,0.55))'}
+                stroke={isActiveTz ? 'var(--accent)' : 'rgba(0,0,0,0.4)'}
+                strokeWidth="0.8"
+                style={{ cursor: 'pointer', transition: 'fill 0.1s' }}
+                onMouseEnter={e => {
+                  setHoveredCity(city);
+                  setHovered(null);
+                  setTooltipPos({ x: e.clientX, y: e.clientY });
+                  e.currentTarget.setAttribute('r', '5');
+                }}
+                onMouseLeave={e => {
+                  setHoveredCity(null);
+                  e.currentTarget.setAttribute('r', '3.5');
+                }}
+                onClick={e => {
+                  e.stopPropagation();
+                  onCitySelect?.(city);
+                }}
+              />
+            </g>
+          );
+        })}
       </svg>
 
-      {/* Tooltip with live time */}
-      {hovered && (
+      {/* Tooltip */}
+      {(hovered || hoveredCity) && (
         <div
-          key={tick} // re-render on tick
           style={{
             position: 'fixed',
             left: tooltipPos.x + 14,
@@ -161,24 +194,36 @@ export default function WorldMap({ onSelect, selectedTz, userCountry }: Props) {
             minWidth: '160px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
-            <span style={{ fontSize: '18px' }}>{hovered.flag}</span>
-            <div>
-              <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>{hovered.name}</div>
-              <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>
-                {hovered.tz}
+          {hoveredCity ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '5px' }}>
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--accent)', display: 'inline-block' }} />
+                <span style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>{hoveredCity.name}</span>
               </div>
-            </div>
-          </div>
-          <div style={{
-            fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 600,
-            color: 'var(--accent)', letterSpacing: '-0.02em',
-          }}>
-            {getLocalTime(hovered.tz)}
-          </div>
-          <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>
-            {getOffsetStr(hovered.tz)} · click to add
-          </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 600, color: 'var(--accent)' }}>
+                {getLocalTime(hoveredCity.tz)}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>
+                {getOffsetStr(hoveredCity.tz)} · click to add
+              </div>
+            </>
+          ) : hovered ? (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', marginBottom: '5px' }}>
+                <span style={{ fontSize: '18px' }}>{hovered.flag}</span>
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px' }}>{hovered.name}</div>
+                  <div style={{ fontFamily: 'var(--mono)', fontSize: '10px', color: 'var(--text-3)' }}>{hovered.tz}</div>
+                </div>
+              </div>
+              <div style={{ fontFamily: 'var(--mono)', fontSize: '18px', fontWeight: 600, color: 'var(--accent)' }}>
+                {getLocalTime(hovered.tz)}
+              </div>
+              <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '2px' }}>
+                {getOffsetStr(hovered.tz)} · click to add
+              </div>
+            </>
+          ) : null}
         </div>
       )}
     </div>
