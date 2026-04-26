@@ -1,12 +1,27 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { WORLD_FEATURES } from '../data/worldMap';
-import { MAP_CITIES, type CityOption } from '../data/multiTzCountries';
-import { coordsToPath, project } from '../utils/mapUtils';
+import { WORLD_FEATURES, type CountryFeature } from '../data/worldMap';
+import { MAP_CITIES, MULTI_TZ_COUNTRIES, type CityOption } from '../data/multiTzCountries';
+import { coordsToPath, unproject, pointInGeometry, getBBox, project } from '../utils/mapUtils';
 
 interface Props {
-  onCitySelect: (city: CityOption) => void;
+  onCountryClick: (country: CountryFeature, cities: CityOption[]) => void;
+  onCityClick: (city: CityOption) => void;
   selectedTz?: string;
   userCountry?: string;
+}
+
+const BBOXES = WORLD_FEATURES.map(f => getBBox(f.geometry));
+
+function findCountry(lng: number, lat: number): CountryFeature | null {
+  const candidates: number[] = [];
+  for (let i = 0; i < WORLD_FEATURES.length; i++) {
+    const [minLng, minLat, maxLng, maxLat] = BBOXES[i];
+    if (lng >= minLng && lng <= maxLng && lat >= minLat && lat <= maxLat) candidates.push(i);
+  }
+  for (const i of candidates) {
+    if (pointInGeometry(lng, lat, WORLD_FEATURES[i].geometry)) return WORLD_FEATURES[i];
+  }
+  return null;
 }
 
 function getLocalTime(tz: string): string {
@@ -19,16 +34,15 @@ function getLocalTime(tz: string): string {
 
 function getOffsetStr(tz: string): string {
   try {
-    const parts = Intl.DateTimeFormat('en', {
-      timeZone: tz, timeZoneName: 'shortOffset',
-    }).formatToParts(new Date());
+    const parts = Intl.DateTimeFormat('en', { timeZone: tz, timeZoneName: 'shortOffset' }).formatToParts(new Date());
     return parts.find(p => p.type === 'timeZoneName')?.value ?? '';
   } catch { return ''; }
 }
 
-export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Props) {
+export default function WorldMap({ onCountryClick, onCityClick, selectedTz, userCountry }: Props) {
+  const [hoveredCountry, setHoveredCountry] = useState<CountryFeature | null>(null);
   const [hoveredCity, setHoveredCity] = useState<CityOption | null>(null);
-  const [tooltipPos, setTooltipPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
   const [tick, setTick] = useState(Date.now());
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -39,14 +53,40 @@ export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Prop
 
   const paths = useMemo(() =>
     WORLD_FEATURES.map(f => ({
-      name: f.name,
-      tz: f.tz,
+      ...f,
       d: coordsToPath(
         f.geometry.type === 'Polygon'
           ? (f.geometry.coordinates as number[][][])
           : (f.geometry.coordinates as number[][][][]).flat()
       )
     })), []);
+
+  const getSVGCoords = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    if (!svgRef.current) return null;
+    const rect = svgRef.current.getBoundingClientRect();
+    return unproject(
+      (e.clientX - rect.left) * (800 / rect.width),
+      (e.clientY - rect.top) * (400 / rect.height)
+    );
+  }, []);
+
+  const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const coords = getSVGCoords(e);
+    if (!coords) return;
+    setHoveredCountry(findCountry(coords[0], coords[1]));
+    setTooltipPos({ x: e.clientX, y: e.clientY });
+  }, [getSVGCoords]);
+
+  const handleClick = useCallback((e: React.MouseEvent<SVGSVGElement>) => {
+    const coords = getSVGCoords(e);
+    if (!coords) return;
+    const country = findCountry(coords[0], coords[1]);
+    if (!country) return;
+    const multiCities = MULTI_TZ_COUNTRIES[country.name] ?? [];
+    onCountryClick(country, multiCities);
+  }, [getSVGCoords, onCountryClick]);
+
+  const tooltip = hoveredCity ?? (hoveredCountry ? { name: hoveredCountry.name, tz: hoveredCountry.tz } : null);
 
   return (
     <div style={{ position: 'relative', width: '100%' }}>
@@ -59,8 +99,11 @@ export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Prop
           background: 'var(--map-ocean)',
           borderRadius: 'var(--r-lg)',
           border: '1px solid var(--border)',
-          cursor: 'default',
+          cursor: hoveredCountry ? 'pointer' : 'default',
         }}
+        onMouseMove={handleMouseMove}
+        onMouseLeave={() => { setHoveredCountry(null); setHoveredCity(null); }}
+        onClick={handleClick}
       >
         {/* Graticule */}
         <g stroke="var(--border)" strokeWidth="0.3" opacity="0.4">
@@ -72,23 +115,24 @@ export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Prop
           ))}
         </g>
 
-        {/* Countries - no click, just visual */}
+        {/* Countries */}
         {paths.map(({ name, tz, d }) => {
-          const isUserCountry = name === userCountry;
+          const isUser = name === userCountry;
           const isActive = selectedTz === tz;
+          const isHovered = hoveredCountry?.name === name;
+          let fill = 'var(--map-land)';
+          if (isActive) fill = 'var(--accent)';
+          else if (isUser) fill = 'var(--map-user)';
+          else if (isHovered) fill = 'var(--map-hover)';
           return (
-            <path
-              key={`${name}-${tz}`}
-              d={d}
-              fill={isActive ? 'var(--accent)' : isUserCountry ? 'var(--map-user)' : 'var(--map-land)'}
-              stroke="var(--map-border)"
-              strokeWidth="0.4"
+            <path key={`${name}-${tz}`} d={d} fill={fill}
+              stroke="var(--map-border)" strokeWidth="0.4"
               style={{ transition: 'fill 0.1s' }}
             />
           );
         })}
 
-        {/* City dots - hover shows tooltip, click adds to clock */}
+        {/* City dots */}
         {MAP_CITIES.map(city => {
           const [cx, cy] = project(city.lng, city.lat);
           const isActive = selectedTz === city.tz;
@@ -98,29 +142,31 @@ export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Prop
               cx={cx} cy={cy}
               r={isActive ? 4.5 : 3}
               fill={isActive ? 'var(--accent)' : 'var(--map-dot)'}
-              stroke={isActive ? 'rgba(0,0,0,0.3)' : 'rgba(0,0,0,0.5)'}
+              stroke="rgba(0,0,0,0.5)"
               strokeWidth="0.8"
               style={{ cursor: 'pointer', transition: 'all 0.1s' }}
               onMouseEnter={e => {
+                e.stopPropagation();
                 setHoveredCity(city);
+                setHoveredCountry(null);
                 setTooltipPos({ x: e.clientX, y: e.clientY });
                 if (!isActive) e.currentTarget.setAttribute('r', '5');
               }}
-              onMouseMove={e => setTooltipPos({ x: e.clientX, y: e.clientY })}
+              onMouseMove={e => { e.stopPropagation(); setTooltipPos({ x: e.clientX, y: e.clientY }); }}
               onMouseLeave={e => {
                 setHoveredCity(null);
                 if (!isActive) e.currentTarget.setAttribute('r', '3');
               }}
-              onClick={() => onCitySelect(city)}
+              onClick={e => { e.stopPropagation(); onCityClick(city); }}
             />
           );
         })}
       </svg>
 
       {/* Tooltip */}
-      {hoveredCity && (
+      {tooltip && (
         <div
-          key={`${hoveredCity.name}-${tick}`}
+          key={`${tooltip.name}-${tick}`}
           style={{
             position: 'fixed',
             left: tooltipPos.x + 14,
@@ -136,13 +182,13 @@ export default function WorldMap({ onCitySelect, selectedTz, userCountry }: Prop
           }}
         >
           <div style={{ fontWeight: 600, color: 'var(--text)', fontSize: '13px', marginBottom: '4px' }}>
-            {hoveredCity.name}
+            {tooltip.name}
           </div>
           <div style={{ fontFamily: 'var(--mono)', fontSize: '20px', fontWeight: 600, color: 'var(--accent)' }}>
-            {getLocalTime(hoveredCity.tz)}
+            {getLocalTime(tooltip.tz)}
           </div>
           <div style={{ fontSize: '10px', color: 'var(--text-3)', marginTop: '3px' }}>
-            {getOffsetStr(hoveredCity.tz)} · click to add
+            {getOffsetStr(tooltip.tz)} · click to add
           </div>
         </div>
       )}

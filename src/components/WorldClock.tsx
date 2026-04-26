@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import WorldMap from './WorldMap';
+import type { CountryFeature } from '../data/worldMap';
 import { type CityOption } from '../data/multiTzCountries';
 import { X } from 'lucide-react';
 
@@ -151,6 +152,23 @@ export default function WorldClock() {
     addCity(city.name, city.tz, '', city.name);
   }, [addCity]);
 
+  // Country click: if multi-tz, add all unique timezone cities; if single-tz, add directly
+  const handleCountryClick = useCallback((country: CountryFeature, multiCities: CityOption[]) => {
+    if (multiCities.length > 0) {
+      // Add first city of each unique timezone
+      const seen = new Set<string>();
+      multiCities.forEach(city => {
+        if (!seen.has(city.tz)) {
+          seen.add(city.tz);
+          addCity(city.name, city.tz, country.flag, country.name);
+        }
+      });
+      setSelectedTz(multiCities[0].tz);
+    } else {
+      addCity(country.name, country.tz, country.flag, country.name);
+    }
+  }, [addCity]);
+
   const removeCity = useCallback((tz: string, name: string) => {
     setCities(prev => prev.filter(c => !(c.tz === tz && c.name === name)));
     if (selectedTz === tz) setSelectedTz(undefined);
@@ -179,12 +197,13 @@ export default function WorldClock() {
         {showMap && (
           <>
             <WorldMap
-              onCitySelect={handleCityDotClick}
+              onCountryClick={handleCountryClick}
+              onCityClick={handleCityDotClick}
               selectedTz={selectedTz}
               userCountry={userCountry ?? undefined}
             />
             <p style={{ fontSize: '11px', color: 'var(--text-3)', marginTop: '8px', textAlign: 'center' }}>
-              Hover a city dot to see local time · click to add to clock
+              Click a country or city dot to add to clock · hover to see local time
             </p>
           </>
         )}
