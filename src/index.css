@@ -27,6 +27,10 @@
   --r-lg: 12px;
   --mono: 'JetBrains Mono', 'Fira Code', monospace;
   --sans: 'Space Grotesk', system-ui, sans-serif;
+  --map-ocean: #070c14;
+  --map-land: #1a2235;
+  --map-hover: #2a4a6b;
+  --map-border: #070c14;
 }
 
 .light {
@@ -46,6 +50,10 @@
   --text: #0c0e18;
   --text-2: #4a5568;
   --text-3: #9ca3b8;
+  --map-ocean: #dde8f5;
+  --map-land: #b8cce0;
+  --map-hover: #6ea8fe;
+  --map-border: #dde8f5;
 }
 
 html, body {
