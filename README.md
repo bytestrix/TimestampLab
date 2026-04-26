@@ -2,6 +2,8 @@
 
 Lightweight timestamp utilities with automatic seconds/milliseconds detection. Zero dependencies, ~3KB gzipped.
 
+![TimestampLab demo](./assets/demo.gif)
+
 ```bash
 npm install timestamplab-core
 ```
